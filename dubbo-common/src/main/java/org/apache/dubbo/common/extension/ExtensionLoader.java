@@ -521,6 +521,7 @@ public class ExtensionLoader<T> {
         }
     }
 
+    //dubbo的IOC(依赖注入)方法
     private T injectExtension(T instance) {
         try {
             if (objectFactory != null) {
@@ -530,6 +531,7 @@ public class ExtensionLoader<T> {
                             && Modifier.isPublic(method.getModifiers())) {
                         Class<?> pt = method.getParameterTypes()[0];
                         try {
+                            //这个property其实就是bean的name，例如:setUserDao，解析之后就是 property = userDao，然后再根据这个名称去objectFactory取得相应的对象实例
                             String property = method.getName().length() > 3 ? method.getName().substring(3, 4).toLowerCase() + method.getName().substring(4) : "";
                             Object object = objectFactory.getExtension(pt, property);
                             if (object != null) {

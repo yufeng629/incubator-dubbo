@@ -31,7 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
 /**
- * Only request message will be dispatched to thread pool. Other messages like response, connect, disconnect,
+ * Only request message will be dispatched to thread pool. Other rmq like response, connect, disconnect,
  * heartbeat will be directly executed by I/O thread.
  */
 public class ExecutionChannelHandler extends WrappedChannelHandler {

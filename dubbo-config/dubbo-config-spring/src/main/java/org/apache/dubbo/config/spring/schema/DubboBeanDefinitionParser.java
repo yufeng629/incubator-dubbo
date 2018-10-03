@@ -78,10 +78,11 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         beanDefinition.setLazyInit(false);
         String id = element.getAttribute("id");
         if ((id == null || id.length() == 0) && required) {
+            //如果用户没有配置id，但是又要求必填，则使用默认的规则分配一个id
             String generatedBeanName = element.getAttribute("name");
             if (generatedBeanName == null || generatedBeanName.length() == 0) {
                 if (ProtocolConfig.class.equals(beanClass)) {
-                    generatedBeanName = "dubbo";
+                    generatedBeanName = "dubbo";//默认使用dubbo协议
                 } else {
                     generatedBeanName = element.getAttribute("interface");
                 }

@@ -53,7 +53,7 @@ import java.lang.annotation.Target;
  * <li>{@link ProtocolConfig} binding to property :  "dubbo.protocols"</li>
  * <li>{@link MonitorConfig} binding to property :  "dubbo.monitors"</li>
  * <li>{@link ProviderConfig} binding to property :  "dubbo.providers"</li>
- * <li>{@link ConsumerConfig} binding to property :  "dubbo.consumers"</li>
+ * <li>{@link ConsumerConfig} binding to property :  "dubbo.rmq"</li>
  * </ul>
  *
  * @see EnableDubboConfigBinding
