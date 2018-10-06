@@ -75,7 +75,7 @@ public class DefaultFuture implements ResponseFuture {
         this.id = request.getId();
         this.timeout = timeout > 0 ? timeout : channel.getUrl().getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
         // put into waiting map.
-        FUTURES.put(id, this);
+        FUTURES.put(id, this);//以当前请求Request的id为key，把当前对象放到一个静态Map里面,
         CHANNELS.put(id, channel);
     }
 
@@ -98,9 +98,9 @@ public class DefaultFuture implements ResponseFuture {
      * @return a new DefaultFuture
      */
     public static DefaultFuture newFuture(Channel channel, Request request, int timeout) {
-        final DefaultFuture future = new DefaultFuture(channel, request, timeout);
+        final DefaultFuture future = new DefaultFuture(channel, request, timeout);//初始化对象，并把new出来的对象放到一个静态Map里面
         // timeout check
-        timeoutCheck(future);
+        timeoutCheck(future);//启动一个线程检查是否超时，如果已经超时，则设置超时的response，并把当前对象从Map中移除
         return future;
     }
 
@@ -144,6 +144,7 @@ public class DefaultFuture implements ResponseFuture {
 
     public static void received(Channel channel, Response response) {
         try {
+            //根据Id去静态Map里面移除对象，如果对象已不存在，则说明已经超时了，如果对象还存在，则给这个对象设置response值，然后唤醒在等待的线程
             DefaultFuture future = FUTURES.remove(response.getId());
             if (future != null) {
                 future.doReceived(response);
@@ -173,6 +174,7 @@ public class DefaultFuture implements ResponseFuture {
             long start = System.currentTimeMillis();
             lock.lock();
             try {
+                //循环等待结果，如果已经完成或者等待超时，就退出循环
                 while (!isDone()) {
                     done.await(timeout, TimeUnit.MILLISECONDS);
                     if (isDone() || System.currentTimeMillis() - start > timeout) {
@@ -184,6 +186,7 @@ public class DefaultFuture implements ResponseFuture {
             } finally {
                 lock.unlock();
             }
+            //如果退出来之后还没完成，则抛出一个超时异常
             if (!isDone()) {
                 throw new TimeoutException(sent > 0, channel, getTimeoutMessage(false));
             }
@@ -329,9 +332,9 @@ public class DefaultFuture implements ResponseFuture {
     private void doReceived(Response res) {
         lock.lock();
         try {
-            response = res;
+            response = res;//把response的值设置给当前的DefaultFuture对象
             if (done != null) {
-                done.signal();
+                done.signal();//唤醒在等待的线程
             }
         } finally {
             lock.unlock();

@@ -20,4 +20,6 @@ public interface DemoService {
 
     String sayHello(String name);
 
+    public String sayHello2(String name);
+
 }

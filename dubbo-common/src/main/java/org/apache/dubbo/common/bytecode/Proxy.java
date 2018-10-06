@@ -55,7 +55,6 @@ public abstract class Proxy {
     private static final Map<ClassLoader, Map<String, Object>> ProxyCacheMap = new WeakHashMap<ClassLoader, Map<String, Object>>();
 
     private static final Object PendingGenerationMarker = new Object();
-
     protected Proxy() {
     }
 
@@ -165,6 +164,7 @@ public abstract class Proxy {
                     Class<?> rt = method.getReturnType();
                     Class<?>[] pts = method.getParameterTypes();
 
+                    //把所有的方法调用都交由handler来处理
                     StringBuilder code = new StringBuilder("Object[] args = new Object[").append(pts.length).append("];");
                     for (int j = 0; j < pts.length; j++)
                         code.append(" args[").append(j).append("] = ($w)$").append(j + 1).append(";");

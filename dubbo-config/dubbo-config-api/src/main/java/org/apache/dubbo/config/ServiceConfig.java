@@ -206,6 +206,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         }
 
         if (delay != null && delay > 0) {
+            //如果是延时暴露，则开启一个后台线程，等到达指定的延迟秒数之后再暴露
             delayExportExecutor.schedule(new Runnable() {
                 @Override
                 public void run() {
@@ -213,6 +214,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 }
             }, delay, TimeUnit.MILLISECONDS);
         } else {
+            //不延迟的话就立即开始暴露
             doExport();
         }
     }
@@ -353,7 +355,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrls() {
+        //把注册中心的配置内容转换成URL对象
         List<URL> registryURLs = loadRegistries(true);
+        //遍历配置的协议，然后为每一个协议进行服务暴露
         for (ProtocolConfig protocolConfig : protocols) {
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
@@ -481,10 +485,13 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         // don't export when none is configured
         if (!Constants.SCOPE_NONE.equalsIgnoreCase(scope)) {
 
+            //本地暴露
             // export to local if the config is not remote (export to remote only when config is remote)
             if (!Constants.SCOPE_REMOTE.equalsIgnoreCase(scope)) {
                 exportLocal(url);
             }
+
+            //远程暴露
             // export to remote if the config is not local (export to local only when config is local)
             if (!Constants.SCOPE_LOCAL.equalsIgnoreCase(scope)) {
                 if (logger.isInfoEnabled()) {

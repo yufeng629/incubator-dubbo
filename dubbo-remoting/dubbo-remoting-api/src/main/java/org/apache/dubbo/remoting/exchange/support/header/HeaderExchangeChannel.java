@@ -106,8 +106,9 @@ final class HeaderExchangeChannel implements ExchangeChannel {
         if (closed) {
             throw new RemotingException(this.getLocalAddress(), null, "Failed to send request " + request + ", cause: The channel " + this + " is closed!");
         }
+        //如果是dubbo协议，这个方法传进来的request参数应该是个RpcInvocation对象
         // create request.
-        Request req = new Request();
+        Request req = new Request();//new 一个Request对象，其构造方法会给其自身生成一个ID，这个ID也就是静态属性AtomicLong每次都加1增长，增到最大值之后又从0开始
         req.setVersion(Version.getProtocolVersion());
         req.setTwoWay(true);
         req.setData(request);

@@ -447,12 +447,13 @@ public class ExtensionLoader<T> {
 
     @SuppressWarnings("unchecked")
     public T getAdaptiveExtension() {
+        //先从内存中查看有没有，有的话就直接返回，没有的话就创建一个
         Object instance = cachedAdaptiveInstance.get();
         if (instance == null) {
             if (createAdaptiveInstanceError == null) {
-                synchronized (cachedAdaptiveInstance) {
+                synchronized (cachedAdaptiveInstance) {//加锁
                     instance = cachedAdaptiveInstance.get();
-                    if (instance == null) {
+                    if (instance == null) {//double check，避免多个线程都有创建
                         try {
                             instance = createAdaptiveExtension();
                             cachedAdaptiveInstance.set(instance);
@@ -504,13 +505,16 @@ public class ExtensionLoader<T> {
         try {
             T instance = (T) EXTENSION_INSTANCES.get(clazz);
             if (instance == null) {
+                //根据Class对象取得实例化对象
                 EXTENSION_INSTANCES.putIfAbsent(clazz, clazz.newInstance());
                 instance = (T) EXTENSION_INSTANCES.get(clazz);
             }
+            //进行依赖注入
             injectExtension(instance);
             Set<Class<?>> wrapperClasses = cachedWrapperClasses;
             if (wrapperClasses != null && !wrapperClasses.isEmpty()) {
                 for (Class<?> wrapperClass : wrapperClasses) {
+                    //如果有封装类，则把当前实例对象放到封装类中，然后返回封装类的实例对象
                     instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
                 }
             }
@@ -528,7 +532,7 @@ public class ExtensionLoader<T> {
                 for (Method method : instance.getClass().getMethods()) {
                     if (method.getName().startsWith("set")
                             && method.getParameterTypes().length == 1
-                            && Modifier.isPublic(method.getModifiers())) {
+                            && Modifier.isPublic(method.getModifiers())) {//其实就是通过setter方法来进行注入
                         Class<?> pt = method.getParameterTypes()[0];
                         try {
                             //这个property其实就是bean的name，例如:setUserDao，解析之后就是 property = userDao，然后再根据这个名称去objectFactory取得相应的对象实例
@@ -586,10 +590,11 @@ public class ExtensionLoader<T> {
                     throw new IllegalStateException("more than 1 default extension name on extension " + type.getName()
                             + ": " + Arrays.toString(names));
                 }
-                if (names.length == 1) cachedDefaultName = names[0];
+                if (names.length == 1) cachedDefaultName = names[0];//如果在SPI里面有配置默认值，那么就会缓存这个默认值
             }
         }
 
+        //下面这些就是根据type的名称从jar包里面加载响应的配置，然后根据配置去选择相应的实现类，这就是Dubbo的SPI
         Map<String, Class<?>> extensionClasses = new HashMap<String, Class<?>>();
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName());
         loadDirectory(extensionClasses, DUBBO_INTERNAL_DIRECTORY, type.getName().replace("org.apache", "com.alibaba"));
@@ -601,19 +606,19 @@ public class ExtensionLoader<T> {
     }
 
     private void loadDirectory(Map<String, Class<?>> extensionClasses, String dir, String type) {
-        String fileName = dir + type;
+        String fileName = dir + type;//文件名等于 文件夹 + 类的全名
         try {
             Enumeration<java.net.URL> urls;
             ClassLoader classLoader = findClassLoader();
             if (classLoader != null) {
-                urls = classLoader.getResources(fileName);
+                urls = classLoader.getResources(fileName);//getResources方法会取得当前目录下所有符合fileName的文件句柄，因为是可以跨jar包获取的
             } else {
                 urls = ClassLoader.getSystemResources(fileName);
             }
             if (urls != null) {
                 while (urls.hasMoreElements()) {
                     java.net.URL resourceURL = urls.nextElement();
-                    loadResource(extensionClasses, classLoader, resourceURL);
+                    loadResource(extensionClasses, classLoader, resourceURL);//读取文件中的内容并生成相应的Class对象
                 }
             }
         } catch (Throwable t) {
@@ -663,7 +668,7 @@ public class ExtensionLoader<T> {
                     type + ", class line: " + clazz.getName() + "), class "
                     + clazz.getName() + "is not subtype of interface.");
         }
-        if (clazz.isAnnotationPresent(Adaptive.class)) {
+        if (clazz.isAnnotationPresent(Adaptive.class)) {//如果在类上面有Adaptive注解，则进入到这里
             if (cachedAdaptiveClass == null) {
                 cachedAdaptiveClass = clazz;
             } else if (!cachedAdaptiveClass.equals(clazz)) {
@@ -671,7 +676,7 @@ public class ExtensionLoader<T> {
                         + cachedAdaptiveClass.getClass().getName()
                         + ", " + clazz.getClass().getName());
             }
-        } else if (isWrapperClass(clazz)) {
+        } else if (isWrapperClass(clazz)) {//如果是封装类，则进入到这里
             Set<Class<?>> wrappers = cachedWrapperClasses;
             if (wrappers == null) {
                 cachedWrapperClasses = new ConcurrentHashSet<Class<?>>();
@@ -688,7 +693,7 @@ public class ExtensionLoader<T> {
             }
             String[] names = NAME_SEPARATOR.split(name);
             if (names != null && names.length > 0) {
-                Activate activate = clazz.getAnnotation(Activate.class);
+                Activate activate = clazz.getAnnotation(Activate.class);//类上面是否有Activate注解
                 if (activate != null) {
                     cachedActivates.put(names[0], activate);
                 } else {
@@ -699,7 +704,7 @@ public class ExtensionLoader<T> {
                     }
                 }
                 for (String n : names) {
-                    if (!cachedNames.containsKey(clazz)) {
+                    if (!cachedNames.containsKey(clazz)) {//把Class对象缓存起来
                         cachedNames.put(clazz, n);
                     }
                     Class<?> c = extensionClasses.get(n);
@@ -715,6 +720,9 @@ public class ExtensionLoader<T> {
 
     private boolean isWrapperClass(Class<?> clazz) {
         try {
+            //判断是否是Wrapper类的依据是：当前传进来的clazz类，其是否存在以当前type为参数的构造函数
+            //比如 ProtocolFilterWrapper 类的构造函数是 public ProtocolFilterWrapper(Protocol protocol)
+            //就表示ProtocolFilterWrapper这个类是Protocol的封装类，而ListenerExporterWrapper是Exporter的封装类
             clazz.getConstructor(type);
             return true;
         } catch (NoSuchMethodException e) {
@@ -745,17 +753,22 @@ public class ExtensionLoader<T> {
     }
 
     private Class<?> getAdaptiveExtensionClass() {
+        //先通过SPI方式取得相应的实现类的Class对象
         getExtensionClasses();
         if (cachedAdaptiveClass != null) {
             return cachedAdaptiveClass;
         }
+        //如果上面那一步骤没有获取到，则动态生成这个Adaptive类
         return cachedAdaptiveClass = createAdaptiveExtensionClass();
     }
 
     private Class<?> createAdaptiveExtensionClass() {
+        //动态生成代理类的代码
         String code = createAdaptiveExtensionClassCode();
         ClassLoader classLoader = findClassLoader();
+        //取得编译器的实现类
         org.apache.dubbo.common.compiler.Compiler compiler = ExtensionLoader.getExtensionLoader(org.apache.dubbo.common.compiler.Compiler.class).getAdaptiveExtension();
+        //使用编译器对代码进行编译，然后生成实例对象
         return compiler.compile(code, classLoader);
     }
 

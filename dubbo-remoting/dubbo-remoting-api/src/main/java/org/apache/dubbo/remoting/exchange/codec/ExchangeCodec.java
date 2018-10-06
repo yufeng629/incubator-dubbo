@@ -87,7 +87,7 @@ public class ExchangeCodec extends TelnetCodec {
 
     @Override
     protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] header) throws IOException {
-        // check magic number.
+        // check magic number. 检查魔术数字是否匹配，如果不匹配，则交由TelnetCodec.decode去处理
         if (readable > 0 && header[0] != MAGIC_HIGH
                 || readable > 1 && header[1] != MAGIC_LOW) {
             int length = header.length;
@@ -104,17 +104,17 @@ public class ExchangeCodec extends TelnetCodec {
             }
             return super.decode(channel, buffer, readable, header);
         }
-        // check length.
+        // check length. 检查现有长度是否小于消息头的长度，如果是，说明数据还未传输完全，出现拆包
         if (readable < HEADER_LENGTH) {
             return DecodeResult.NEED_MORE_INPUT;
         }
 
-        // get data length.
+        // get data length. 从消息头里面获取消息体的总长度信息
         int len = Bytes.bytes2int(header, 12);
         checkPayload(channel, len);
 
         int tt = len + HEADER_LENGTH;
-        if (readable < tt) {
+        if (readable < tt) {//检查现有长度是否小于 消息头 + 消息体 的总长度，如果是，说明未传输完全，出现拆包，如果大于，说明出现粘包，通过外部的循环取数据来处理解决
             return DecodeResult.NEED_MORE_INPUT;
         }
 
@@ -211,43 +211,42 @@ public class ExchangeCodec extends TelnetCodec {
     protected void encodeRequest(Channel channel, ChannelBuffer buffer, Request req) throws IOException {
         Serialization serialization = getSerialization(channel);
         // header.
-        byte[] header = new byte[HEADER_LENGTH];
+        byte[] header = new byte[HEADER_LENGTH];//初始化header数组，固定长度为16位
         // set magic number.
-        Bytes.short2bytes(MAGIC, header);
+        Bytes.short2bytes(MAGIC, header);//前2位设置一个固定不变的魔术数字，因为魔术数字需要占用2个字节的长度
 
-        // set request and serialization flag.
+        // set request and serialization flag.//第3位设置是单向还是双向的请求
         header[2] = (byte) (FLAG_REQUEST | serialization.getContentTypeId());
-
-        if (req.isTwoWay()) header[2] |= FLAG_TWOWAY;
-        if (req.isEvent()) header[2] |= FLAG_EVENT;
+        if (req.isTwoWay()) header[2] |= FLAG_TWOWAY;//标识：双向(有去有回)
+        if (req.isEvent()) header[2] |= FLAG_EVENT;//标识：单向(有去无回)
 
         // set request id.
-        Bytes.long2bytes(req.getId(), header, 4);
+        Bytes.long2bytes(req.getId(), header, 4);//第5位开始设置request的id，因为id是long类型，所以需要占用8字节长度(注意：这里没有header[3]的设置，直接从上一步的header[2]跳到了header[4])
 
         // encode request data.
         int savedWriteIndex = buffer.writerIndex();
-        buffer.writerIndex(savedWriteIndex + HEADER_LENGTH);
+        buffer.writerIndex(savedWriteIndex + HEADER_LENGTH);//写入消息头的长度16
         ChannelBufferOutputStream bos = new ChannelBufferOutputStream(buffer);
-        ObjectOutput out = serialization.serialize(channel.getUrl(), bos);
+        ObjectOutput out = serialization.serialize(channel.getUrl(), bos);//序列化数据
         if (req.isEvent()) {
             encodeEventData(channel, out, req.getData());
         } else {
-            encodeRequestData(channel, out, req.getData(), req.getVersion());
+            encodeRequestData(channel, out, req.getData(), req.getVersion());//对要发送的数据进行编码
         }
         out.flushBuffer();
         if (out instanceof Cleanable) {
             ((Cleanable) out).cleanup();
         }
-        bos.flush();
+        bos.flush();//写入消息体数据
         bos.close();
-        int len = bos.writtenBytes();
+        int len = bos.writtenBytes();//计算消息体的字节总长度
         checkPayload(channel, len);
-        Bytes.int2bytes(len, header, 12);
+        Bytes.int2bytes(len, header, 12);//第12位开始写入消息体的总长度
 
         // write
         buffer.writerIndex(savedWriteIndex);
-        buffer.writeBytes(header); // write header.
-        buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len);
+        buffer.writeBytes(header); // write header.//写入消息头
+        buffer.writerIndex(savedWriteIndex + HEADER_LENGTH + len);//写入消息头 + 消息体 的总长度
     }
 
     protected void encodeResponse(Channel channel, ChannelBuffer buffer, Response res) throws IOException {
